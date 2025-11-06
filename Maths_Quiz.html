@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Math Quiz</title>
+<style>
+  :root {
+    --primary: royalblue;
+    --correct: #4caf50;
+    --wrong: #e74c3c;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6fa;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+  }
+
+  #timer, #score {
+    font-weight: 600;
+    margin: 8px 0;
+    font-size: 1.2rem;
+  }
+
+  #question {
+    font-size: 2rem;
+    margin: 20px 0;
+    color: #222;
+  }
+
+  #choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  button {
+    padding: 14px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 10px;
+    background-color: var(--primary);
+    color: white;
+    cursor: pointer;
+    transition: transform 0.1s, background-color 0.2s;
+  }
+
+  button:active { transform: scale(0.95); }
+  button.correct { background-color: var(--correct); }
+  button.wrong { background-color: var(--wrong); }
+
+  #result {
+    margin-top: 30px;
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  #restart {
+    display: none;
+    margin-top: 20px;
+    background-color: #555;
+  }
+
+  #countdown {
+    font-size: 4rem;
+    font-weight: bold;
+    margin-top: 60px;
+    color: var(--primary);
+    display: none;
+    opacity: 0;
+    animation: fade 0.8s ease-in-out;
+  }
+
+  @keyframes fade {
+    0% { opacity: 0; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* Confetti style */
+  .confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 9999;
+    animation: confetti-fall 1s forwards;
+  }
+
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(300px) rotate(360deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Math Quiz</h1>
+<div id="timer">Time: 20</div>
+<div id="score">Score: 0</div>
+<div id="countdown"></div>
+<div id="question"></div>
+<div id="choices"></div>
+<div id="result"></div>
+<button id="restart">Start Again</button>
+
+<script>
+const originalQuestions = [
+  { question: "1 + 1", answer: 2 },
+  { question: "2 + 2", answer: 4 },
+  { question: "5 + 5", answer: 10 },
+  { question: "4 + 4", answer: 8 },
+  { question: "3 + 3", answer: 6 }
+];
+
+let questions = [];
+let index = 0;
+let score = 0;
+let time = 20;
+let timer;
+
+const qElem = document.getElementById("question");
+const cElem = document.getElementById("choices");
+const timerElem = document.getElementById("timer");
+const scoreElem = document.getElementById("score");
+const resultElem = document.getElementById("result");
+const restartBtn = document.getElementById("restart");
+const countdownElem = document.getElementById("countdown");
+
+restartBtn.addEventListener("click", restartQuiz);
+
+function startQuiz() {
+  questions = JSON.parse(JSON.stringify(originalQuestions));
+  index = 0;
+  score = 0;
+  time = 20;
+
+  timerElem.textContent = `Time: ${time}`;
+  scoreElem.textContent = `Score: ${score}`;
+  resultElem.textContent = "";
+  restartBtn.style.display = "none";
+  qElem.textContent = "";
+  cElem.innerHTML = "";
+
+  clearInterval(timer);
+  startCountdown();
+}
+
+function startCountdown() {
+  let count = 3;
+  countdownElem.style.display = "block";
+  showCountdownNumber(count);
+
+  const countdownTimer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      showCountdownNumber(count);
+    } else {
+      clearInterval(countdownTimer);
+      showCountdownNumber("Go!", true);
+      setTimeout(() => {
+        countdownElem.style.display = "none";
+        beginQuestions();
+      }, 700);
+    }
+  }, 1000);
+}
+
+function showCountdownNumber(number, go=false) {
+  countdownElem.textContent = number;
+  countdownElem.style.animation = "none";
+  countdownElem.offsetHeight;
+  countdownElem.style.animation = "fade 0.8s ease-in-out";
+
+  if(go) playGoTone(); else playBeep();
+}
+
+function beginQuestions() {
+  timer = setInterval(() => {
+    time--;
+    timerElem.textContent = `Time: ${time}`;
+    if (time <= 0) {
+      clearInterval(timer);
+      showTimeUp();
+    }
+  }, 1000);
+  showQuestion();
+}
+
+function showQuestion() {
+  const q = questions[index];
+  qElem.textContent = q.question + " = ?";
+  cElem.innerHTML = "";
+
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    btn.onclick = () => checkAnswer(btn, i);
+    cElem.appendChild(btn);
+  }
+}
+
+function checkAnswer(btn, choice) {
+  const q = questions[index];
+  if (choice === q.answer) {
+    score++;
+    scoreElem.textContent = `Score: ${score}`;
+    playSound(true);
+    showConfetti();
+    btn.classList.add("correct");
+    setTimeout(nextQuestion, 400);
+  } else {
+    playSound(false);
+    btn.classList.add("wrong");
+    setTimeout(() => btn.classList.remove("wrong"), 400);
+  }
+}
+
+function nextQuestion() {
+  if (index < questions.length - 1) {
+    index++;
+    showQuestion();
+  } else {
+    endQuiz();
+  }
+}
+
+function showTimeUp() {
+  qElem.textContent = "⏰ Time’s up!";
+  cElem.innerHTML = "";
+  resultElem.textContent = `Score: ${score} / ${questions.length}`;
+  restartBtn.style.display = "inline-block";
+  playSound(false);
+}
+
+function endQuiz() {
+  clearInterval(timer);
+  qElem.textContent = "🎉 All done!";
+  cElem.innerHTML = "";
+  resultElem.textContent = `Final Score: ${score} / ${questions.length}`;
+  restartBtn.style.display = "inline-block";
+}
+
+function restartQuiz() {
+  clearInterval(timer);
+  startQuiz();
+}
+
+// ✅ Sound functions
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "sine"; o.frequency.value = 440; g.gain.value = 0.2;
+  o.connect(g).connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime + 0.2);
+}
+
+function playGoTone() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "triangle"; o.frequency.value = 880; g.gain.value = 0.3;
+  o.connect(g).connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime + 0.3);
+}
+
+function playSound(correct) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = "sine"; o.frequency.value = correct ? 800 : 200;
+  g.gain.value = 0.25; o.connect(g).connect(ctx.destination);
+  o.start(); o.stop(ctx.currentTime + 0.15);
+}
+
+// ✅ Confetti effect
+function showConfetti() {
+  const colors = ['#e74c3c','#f1c40f','#2ecc71','#3498db','#9b59b6','#e67e22'];
+  for (let i = 0; i < 20; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.left = Math.random() * window.innerWidth + 'px';
+    confetti.style.top = Math.random() * 50 + 'px';
+    confetti.style.width = confetti.style.height = Math.random() * 8 + 5 + 'px';
+    document.body.appendChild(confetti);
+    setTimeout(() => confetti.remove(), 1000);
+  }
+}
+
+startQuiz();
+</script>
+</body>
+</html>
